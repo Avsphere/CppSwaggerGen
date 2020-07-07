@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using CppSwagger;
+using CppSwagger.DataContracts;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
@@ -31,11 +32,19 @@ namespace CppSwaggerTesting
         }
 
         [Test]
-        public void CanClassifyRef()
+        public void CanResolveRef()
         {
             JObject resolvableRef = this.SwaggerJson["definitions"]["Config"]["properties"]["Version"] as JObject;
 
             Assert.IsTrue(SwaggerPropertyClassifier.IsSwaggerPropertyResolvable(resolvableRef));
+        }
+
+        [Test]
+        public void CanClassifyRef()
+        {
+            JObject resolvableRef = this.SwaggerJson["definitions"]["Config"]["properties"]["Version"] as JObject;
+
+            Assert.IsTrue(SwaggerPropertyClassifier.GetResolvableType(resolvableRef) == ResolvableSwaggerType.Ref);
         }
 
         [Test]
@@ -82,28 +91,52 @@ namespace CppSwaggerTesting
 
         
         [Test]
-        public void ConvienceFunction_CanClassifyResolvableArrayOfArrays()
+        public void CanClassifyPrimitive_ResolvableSwaggerType()
         {
-            JObject resolvableArrayOfArrays = this.SwaggerJson["definitions"]["SystemInfo"]["properties"]["SystemStatus"] as JObject;
+            JObject withOnlySimpleProperties = this.SwaggerJson["definitions"]["EndpointPortConfig"]["properties"] as JObject;
 
-            Assert.IsTrue(SwaggerPropertyClassifier.IsArrayOfResolvableArrays(resolvableArrayOfArrays));
+            foreach (KeyValuePair<string, JToken> keyValue in withOnlySimpleProperties)
+            {
+                Assert.IsTrue(SwaggerPropertyClassifier.GetResolvableType(keyValue.Value as JObject) == ResolvableSwaggerType.Primitive);
+            }
         }
 
         [Test]
-        public void ConvienceFunction_CanClassifyResolvableMapOfArrays()
+        public void CanClassifyArrayOfPrimitives_ResolvableSwaggerType()
         {
-            JObject resolvableMapOfArrays = this.SwaggerJson["definitions"]["PortMap"] as JObject;
+            JObject resolvableArray = this.SwaggerJson["definitions"]["RegistryServiceConfig"]["properties"]["AllowNondistributableArtifactsHostnames"] as JObject;
 
-            Assert.IsTrue(SwaggerPropertyClassifier.IsMapOfResolvableArrays(resolvableMapOfArrays));
+            Assert.IsTrue(SwaggerPropertyClassifier.GetResolvableType(resolvableArray) == ResolvableSwaggerType.ArrayOfPrimitives);
         }
-
 
         [Test]
-        public void CanClassifiesNonResolvableObject()
+        public void CanClassifyArrayOfRefs_ResolvableSwaggerType()
         {
-            JObject nonResolvable = this.SwaggerJson["definitions"]["EndpointPortConfig"] as JObject;
-            
-            Assert.IsFalse(SwaggerPropertyClassifier.IsSwaggerPropertyResolvable(nonResolvable));
+            JObject arrayOfRefs = this.SwaggerJson["definitions"]["SwarmInfo"]["properties"]["RemoteManagers"] as JObject;
+            Assert.IsTrue(SwaggerPropertyClassifier.GetResolvableType(arrayOfRefs) == ResolvableSwaggerType.ArrayOfRefs);
         }
+
+        [Test]
+        public void CanClassifyArrayOfArrayPrimitives_ResolvableSwaggerType()
+        {
+            JObject arrayOfPrimitiveArrays = this.SwaggerJson["definitions"]["SystemInfo"]["properties"]["SystemStatus"] as JObject;
+
+            Assert.IsTrue(SwaggerPropertyClassifier.GetResolvableType(arrayOfPrimitiveArrays) == ResolvableSwaggerType.ArrayArrayOfPrimitives);
+        }
+
+        [Test]
+        public void CanClassifyPrimitiveMap_ResolvableSwaggerType()
+        {
+            JObject mapOfStrings = this.SwaggerJson["definitions"]["Volume"]["properties"]["Labels"] as JObject;
+            Assert.IsTrue(SwaggerPropertyClassifier.GetResolvableType(mapOfStrings) == ResolvableSwaggerType.MapOfPrimitives);
+        }
+
+        [Test]
+        public void CanClassifyRefMap_ResolvableSwaggerType()
+        {
+            JObject mapOfRefs = this.SwaggerJson["definitions"]["RegistryServiceConfig"]["properties"]["IndexConfigs"] as JObject;
+            Assert.IsTrue(SwaggerPropertyClassifier.GetResolvableType(mapOfRefs) == ResolvableSwaggerType.MapOfRefs);
+        }
+
     }
 }

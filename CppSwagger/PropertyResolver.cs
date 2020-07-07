@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using CppSwagger.DataContracts;
 using Newtonsoft.Json.Linq;
@@ -8,7 +9,7 @@ namespace CppSwagger
 {
     public static class PropertyResolver
     {
-        private static string ConvertBasicTypeToCppType(string type)
+        private static string ConvertPrimitiveTypeToCppType(string type)
         {
             if (type == "string")
             {
@@ -28,62 +29,128 @@ namespace CppSwagger
             }
         }
 
+        private static string ConvertRefToCppType(string refString)
+        {
+            string[] refParts = refString.Split('/');
+            return refParts[refParts.Length - 1];
+        }
+
         private static PreprocessedProperty ResolveBasicType(string type, string name)
         {
             PreprocessedProperty preprocessedProperty = new PreprocessedProperty()
             {
-                EncapsulationType = EncapsulationType.None,
+                ResolvableSwaggerType = ResolvableSwaggerType.Primitive,
                 Name = name,
-                Type = ConvertBasicTypeToCppType(type)
+                Type = ConvertPrimitiveTypeToCppType(type)
             };
 
             return preprocessedProperty;
         }
 
 
-        // IN PROGRESS
         private static PreprocessedProperty ResolveArray(string propertyName, JObject property)
         {
             PreprocessedProperty preprocessedProperty = new PreprocessedProperty()
             {
                 Name = propertyName,
-                EncapsulationType = EncapsulationType.Array
+                ResolvableSwaggerType = SwaggerPropertyClassifier.GetResolvableArrayType(property)
             };
 
-            if (SwaggerPropertyClassifier.IsArrayOfResolvableArrays(property))
+            if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.ArrayOfPrimitives)
             {
-                preprocessedProperty.EncapsulationType = EncapsulationType.ArrayOfArrays;
+                preprocessedProperty.Type = ConvertPrimitiveTypeToCppType(property["items"]["type"].ToString());
             }
-            
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.ArrayArrayOfPrimitives)
+            {
+                preprocessedProperty.Type = ConvertPrimitiveTypeToCppType(property["items"]["items"]["type"].ToString());
+            }
+
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.ArrayOfRefs)
+            {
+                preprocessedProperty.Type = ConvertRefToCppType(property["items"]["$ref"].ToString());
+            }
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.ArrayArrayOfRefs)
+            {
+                preprocessedProperty.Type = ConvertRefToCppType(property["items"]["items"]["$ref"].ToString());
+            }
+
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.ArrayOfMapOfRefs)
+            {
+                preprocessedProperty.Type = ConvertRefToCppType(property["items"]["additionalProperties"]["$ref"].ToString());
+            }
+
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.ArrayOfPrimitiveMaps)
+            {
+                preprocessedProperty.Type = ConvertPrimitiveTypeToCppType(property["items"]["additionalProperties"]["type"].ToString());
+            }
+
+            else
+            {
+                throw new Exception($"ResolveArray cannot create preprocessed property given propertyName {propertyName} and ResolvableSwaggerType {preprocessedProperty.ResolvableSwaggerType.ToString()}");
+            }
 
             return preprocessedProperty;
         }
 
-        // IN PROGRESS
         private static PreprocessedProperty ResolveMap(string propertyName, JObject property)
         {
+
             PreprocessedProperty preprocessedProperty = new PreprocessedProperty()
             {
                 Name = propertyName,
-                EncapsulationType = EncapsulationType.Map
+                ResolvableSwaggerType = SwaggerPropertyClassifier.GetResolvableMapType(property)
             };
+
+            if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.MapOfPrimitives)
+            {
+                preprocessedProperty.Type = ConvertPrimitiveTypeToCppType(property["additionalProperties"]["type"].ToString());
+            }
+
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.MapOfRefs)
+            {
+                preprocessedProperty.Type = ConvertRefToCppType(property["additionalProperties"]["$ref"].ToString());
+            }
+
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.MapOfRefArrays)
+            {
+                preprocessedProperty.Type = ConvertRefToCppType(property["additionalProperties"]["items"]["$ref"].ToString());
+            }
+
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.MapOfRefMaps)
+            {
+                preprocessedProperty.Type = ConvertRefToCppType(property["additionalProperties"]["additionalProperties"]["$ref"].ToString());
+            }
+
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.MapOfPrimitiveArrays)
+            {
+                preprocessedProperty.Type = ConvertPrimitiveTypeToCppType(property["additionalProperties"]["items"]["type"].ToString());
+            }
+
+            else if (preprocessedProperty.ResolvableSwaggerType == ResolvableSwaggerType.MapOfPrimitiveMaps)
+            {
+                preprocessedProperty.Type = ConvertPrimitiveTypeToCppType(property["additionalProperties"]["additionalProperties"]["type"].ToString());
+            }
+
+            else
+            {
+                throw new Exception($"ResolveMap cannot create preprocessed property given propertyName {propertyName} and ResolvableSwaggerType {preprocessedProperty.ResolvableSwaggerType.ToString()}");
+            }
 
             return preprocessedProperty;
         }
 
-        // IN PROGRESS
         private static PreprocessedProperty ResolveRef(string propertyName, JObject property)
         {
             PreprocessedProperty preprocessedProperty = new PreprocessedProperty()
             {
-                Name = propertyName
+                Name = propertyName,
+                ResolvableSwaggerType = ResolvableSwaggerType.Ref,
+                Type = ConvertRefToCppType(property["$ref"].ToString())
             };
 
             return preprocessedProperty;
         }
 
-
-        // IN PROGRESS
         public static PreprocessedProperty ResolveSimpleProperty(string propertyName, JObject resolvableProperty)
         {
             EnsureResolvable(resolvableProperty);

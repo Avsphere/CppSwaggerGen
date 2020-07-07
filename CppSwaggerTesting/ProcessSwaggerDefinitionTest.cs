@@ -31,7 +31,6 @@ namespace CppSwaggerTesting
 
         }
 
-        // IN PROGRESSS
         [Test]
         public void ProcessDefinitionWithNestedObjects()
         {

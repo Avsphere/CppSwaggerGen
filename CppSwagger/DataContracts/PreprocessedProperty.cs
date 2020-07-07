@@ -8,6 +8,6 @@ namespace CppSwagger.DataContracts
     {
         public string Type { get; set; }
         public string Name { get; set; }
-        public EncapsulationType EncapsulationType { get; set; }
+        public ResolvableSwaggerType ResolvableSwaggerType { get; set; }
     }
 }

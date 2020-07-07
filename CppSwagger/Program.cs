@@ -11,9 +11,6 @@ namespace CppSwagger
         {
             string swaggerJsonString = File.ReadAllText(ConfigurationManager.AppSettings["swagger_docker_json_path"]);
             JObject swaggerJson = JObject.Parse(swaggerJsonString);
-
-
-
         }
     }
 }

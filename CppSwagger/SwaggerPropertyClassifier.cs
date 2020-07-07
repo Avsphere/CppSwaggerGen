@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using CppSwagger.DataContracts;
 using Newtonsoft.Json.Linq;
 
 namespace CppSwagger
@@ -48,70 +49,6 @@ namespace CppSwagger
             return additionalProperties.ContainsKey("enum");
         }
 
-        public static bool IsArrayOfResolvableArrays(JObject swaggerProperty)
-        {
-            if (!IsResolvableArray(swaggerProperty))
-            {
-                return false;
-            }
-
-            JObject items = swaggerProperty["items"] as JObject;
-            
-            return IsResolvableArray(items);
-        }
-
-        public static bool IsArrayOfResolvableMaps(JObject swaggerProperty)
-        {
-            if (!IsResolvableArray(swaggerProperty))
-            {
-                return false;
-            }
-
-            JObject items = swaggerProperty["items"] as JObject;
-
-            return IsResolvableMap(items);
-        }
-
-        public static bool IsMapOfResolvableArrays(JObject swaggerProperty)
-        {
-            if (!IsResolvableMap(swaggerProperty))
-            {
-                return false;
-            }
-
-            JObject additionalProperties = swaggerProperty["additionalProperties"] as JObject;
-
-            return IsResolvableArray(additionalProperties);
-        }
-
-        public static bool IsMapOfResolvableMaps(JObject swaggerProperty)
-        {
-            if (!IsResolvableMap(swaggerProperty))
-            {
-                return false;
-            }
-
-            JObject additionalProperties = swaggerProperty["additionalProperties"] as JObject;
-
-            return IsResolvableMap(additionalProperties);
-        }
-
-        public static bool IsResolvableArray(JObject swaggerProperty)
-        {
-            if (HasItems(swaggerProperty) == false)
-            {
-                return false;
-            }
-
-            JObject items = swaggerProperty["items"] as JObject;
-            bool isArrayOfRefs = IsRef(items);
-            bool isArrayOfBasicTypes = IsBasicType(items);
-            bool isArrayOfResolvableMaps = IsResolvableMap(items);
-            bool isResolvableArrayOfArrays = IsResolvableArray(items);
-
-            return isArrayOfRefs || isArrayOfBasicTypes || isArrayOfResolvableMaps || isResolvableArrayOfArrays;
-        }
-
         public static bool IsResolvableMap(JObject swaggerProperty)
         {
             if (HasAdditionalProperties(swaggerProperty) == false)
@@ -129,6 +66,144 @@ namespace CppSwagger
             return isMapOfBasicTypes || isMapContainingARef || isMapContainingABasicArray || isResolvableMapOfMaps;
         }
 
+
+        public static ResolvableSwaggerType GetResolvableMapType(JObject swaggerProperty)
+        {
+            if (HasAdditionalProperties(swaggerProperty) == false)
+            {
+                throw new Exception($"GetResolvableMapType passed property has no additional properties {swaggerProperty.ToString()}");
+            }
+
+            JObject additionalProperties = swaggerProperty["additionalProperties"] as JObject;
+
+            if (IsBasicType(additionalProperties))
+            {
+                return ResolvableSwaggerType.MapOfPrimitives;
+            }
+            else if (IsRef(additionalProperties))
+            {
+                return ResolvableSwaggerType.MapOfRefs;
+            }
+            else if (IsResolvableArray(additionalProperties))
+            {
+                ResolvableSwaggerType arrayType = GetResolvableArrayType(additionalProperties);
+                
+                if (arrayType == ResolvableSwaggerType.ArrayOfRefs)
+                {
+                    return ResolvableSwaggerType.MapOfRefArrays;
+                }
+                else if (arrayType == ResolvableSwaggerType.ArrayOfPrimitives)
+                {
+                    return ResolvableSwaggerType.MapOfPrimitiveArrays;
+                }
+                else
+                {
+                    throw new Exception($"GetResolvableMapType IsResolvableArray can't specify type: {swaggerProperty.ToString()}");
+                }
+            }
+            else if (IsResolvableMap(additionalProperties))
+            {
+                ResolvableSwaggerType mapType = GetResolvableMapType(additionalProperties);
+
+                if (mapType == ResolvableSwaggerType.MapOfPrimitives)
+                {
+                    return ResolvableSwaggerType.MapOfPrimitiveMaps;
+                }
+                else if (mapType == ResolvableSwaggerType.MapOfRefs)
+                {
+                    return ResolvableSwaggerType.MapOfRefMaps;
+                }
+                else
+                {
+                    throw new Exception($"GetResolvableMapType IsResolvableMap can't specify type: {swaggerProperty.ToString()}");
+                }
+            }
+            else
+            {
+                throw new Exception($"GetResolvableMapType can't specify type: {swaggerProperty.ToString()}");
+            }
+        }
+        public static bool IsResolvableArray(JObject swaggerProperty)
+        {
+            if (HasItems(swaggerProperty) == false)
+            {
+                return false;
+            }
+
+            JObject items = swaggerProperty["items"] as JObject;
+            bool isArrayOfRefs = IsRef(items);
+            bool isArrayOfBasicTypes = IsBasicType(items);
+            bool isArrayOfResolvableMaps = IsResolvableMap(items);
+            bool isResolvableArrayOfArrays = IsResolvableArray(items);
+
+            return isArrayOfRefs || isArrayOfBasicTypes || isArrayOfResolvableMaps || isResolvableArrayOfArrays;
+        }
+
+
+        public static ResolvableSwaggerType GetResolvableArrayType(JObject swaggerProperty)
+        {
+            if (HasItems(swaggerProperty) == false)
+            {
+                throw new Exception($"GetResolvableArrayType passed property has no items {swaggerProperty.ToString()}");
+            }
+            
+            JObject items = swaggerProperty["items"] as JObject;
+
+            if (IsRef(items))
+            {
+                return ResolvableSwaggerType.ArrayOfRefs;
+            }
+            else if (IsBasicType(items))
+            {
+                return ResolvableSwaggerType.ArrayOfPrimitives;
+            }
+            else if (IsResolvableMap(items))
+            {
+                ResolvableSwaggerType mapType = GetResolvableMapType(items);
+                if (mapType == ResolvableSwaggerType.MapOfPrimitives)
+                {
+                    return ResolvableSwaggerType.ArrayOfPrimitiveMaps;
+                }
+                else if (mapType == ResolvableSwaggerType.MapOfRefs)
+                {
+                    return ResolvableSwaggerType.ArrayOfMapOfRefs;
+                }
+                else
+                {
+                    throw new Exception($"GetResolvableArrayType IsResolvableMap can't specify type: {swaggerProperty.ToString()}");
+                }
+            }
+            else if (IsResolvableArray(items))
+            {
+                ResolvableSwaggerType arrayType = GetResolvableArrayType(items);
+                if (arrayType == ResolvableSwaggerType.ArrayOfPrimitives)
+                {
+                    return ResolvableSwaggerType.ArrayArrayOfPrimitives;
+                }
+                else if (arrayType == ResolvableSwaggerType.ArrayOfRefs)
+                {
+                    return ResolvableSwaggerType.ArrayArrayOfRefs;
+                }
+                else if (arrayType == ResolvableSwaggerType.ArrayOfPrimitiveMaps)
+                {
+                    return ResolvableSwaggerType.ArrayArrayOfPrimitiveMaps;
+                }
+                else
+                {
+                    throw new Exception($"GetResolvableArrayType IsResolvableArray can't specify type: {swaggerProperty.ToString()}");
+                }
+            }
+            else
+            {
+                throw new Exception($"GetResolvableArrayType passed property can't be resolved {swaggerProperty.ToString()}");
+            }
+        }
+
+
+
+
+
+
         /*
          * Given a definition pulled from the top level of the swagger json determine if the header file needs a class, if it does, it is deemed normal
          * 
@@ -143,9 +218,35 @@ namespace CppSwagger
             return isAnObject && hasProperties;
         }
 
+        public static ResolvableSwaggerType GetResolvableType(JObject swaggerProperty)
+        {
+            if (IsBasicType(swaggerProperty))
+            {
+                return ResolvableSwaggerType.Primitive;
+            }
+            else if (IsRef(swaggerProperty))
+            {
+                return ResolvableSwaggerType.Ref;
+            }
+            else if (IsResolvableArray(swaggerProperty))
+            {
+                return GetResolvableArrayType(swaggerProperty);
+            }
+            else if (IsResolvableMap(swaggerProperty))
+            {
+                return GetResolvableMapType(swaggerProperty);
+            }
+            else
+            {
+                throw new Exception($"GetResolvableType passed property can't be resolved {swaggerProperty.ToString()}");
+            }
+        }
+
+
         public static bool IsSwaggerPropertyResolvable(JObject swaggerProperty)
         {
             return IsRef(swaggerProperty) || IsBasicType(swaggerProperty) || IsResolvableArray(swaggerProperty) || IsResolvableMap(swaggerProperty);
         }
+
     }
 }
